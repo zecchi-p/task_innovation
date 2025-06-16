@@ -5,16 +5,15 @@ import time
 import random
 
 # Set the data file path to a location in the local Colab filesystem
-# Reverting from Google Drive to avoid persistent PermissionError issues
+# Using local storage in /content/ to avoid Google Drive permission issues
 DATA_FILE = 'tasks.json' # Saves directly in the /content/ directory
 
-# --- Task Data Management Functions (Simplified for local storage) ---
-# Removed Google Drive specific checks and directory creation from these functions
+# --- Task Data Management Functions ---
 
 def load_tasks():
     """Loads tasks from the JSON data file from the local filesystem."""
+    # Check if the data file exists. If not, initialize with sample tasks.
     if not os.path.exists(DATA_FILE):
-        # Initialize with some sample tasks if the file doesn't exist
         initial_tasks = {
             '1': {'id': '1', 'name': 'デザイン検討', 'area': 'アイデア', 'creator': 'system', 'chat': [{'sender': 'system', 'message': '最初のデザイン案について話しましょう。'}]},
             '2': {'id': '2', 'name': '機能実装', 'area': '進行中', 'creator': 'system', 'chat': []},
@@ -26,14 +25,12 @@ def load_tasks():
         try:
             return json.load(f)
         except json.JSONDecodeError:
-            # Use st.error for visibility in the Streamlit app if it manages to start
-            # st.warning(f"タスクデータファイル '{DATA_FILE}' が無効なJSON形式です。空のタスクリストとしてロードします。")
-            print(f"Warning: Task data file '{DATA_FILE}' is invalid JSON. Loading as empty list.") # Use print for subprocess visibility
+            # Handle case where JSON is invalid or empty
+            st.warning(f"タスクデータファイル '{DATA_FILE}' が無効なJSON形式です。空のタスクリストとしてロードします。")
             return {} # Return empty dict if JSON is invalid
         except Exception as e:
-            # Use st.error for visibility in the Streamlit app if it manages to start
-            # st.error(f"タスクファイルの読み込み中にエラーが発生しました: {e}")
-            print(f"Error loading task file: {e}") # Use print for subprocess visibility
+            # Catch other potential file reading errors
+            st.error(f"タスクファイルの読み込み中にエラーが発生しました: {e}")
             return {}
 
 
@@ -43,15 +40,14 @@ def save_tasks(tasks):
         with open(DATA_FILE, 'w') as f:
             json.dump(tasks, f, indent=4)
     except Exception as e:
-        # Use st.error for visibility in the Streamlit app if it manages to start
-        # st.error(f"タスクファイルの保存中にエラーが発生しました: {e}")
-        print(f"Error saving task file: {e}") # Use print for subprocess visibility
+        st.error(f"タスクファイルの保存中にエラーが発生しました: {e}")
 
 
 def add_task(task_name, area, creator):
     """Adds a new task to the tasks data."""
     tasks = load_tasks()
     # Generate a unique ID based on current timestamp and a small random number
+    # Using timestamp + random ensures high probability of uniqueness
     task_id = str(int(time.time() * 1000) + random.randint(0, 999))
     new_task = {
         'id': task_id,
@@ -146,9 +142,11 @@ if st.session_state['page'] == 'main':
     st.subheader("新しいタスクを作成")
     # Use columns for a slightly better layout for the form elements
     form_col1, form_col2 = st.columns([2, 1])
-    with st.form("new_task_form", clear_on_submit=True):
+    # Use a unique key for the task name input field and manage its value in session state
+    task_name_input_key = "new_task_name_input"
+    with st.form("new_task_form", clear_on_submit=False): # Don't clear on submit automatically
         with form_col1:
-            task_name = st.text_input("タスク名", key="task_name_input")
+            task_name = st.text_input("タスク名", key=task_name_input_key, value=st.session_state.get(task_name_input_key, ""))
         with form_col2:
              area = st.selectbox("初期エリア", ["アイデア", "進行中", "決定", "完了"], key="area_select")
 
@@ -158,9 +156,11 @@ if st.session_state['page'] == 'main':
                 creator = st.session_state.get('logged_in_user', 'ゲスト')
                 add_task(task_name, area, creator)
                 st.success("タスクが作成されました！")
-                st.rerun() # Rerun to show the new task
+                # Manually clear the input field by updating its session state value
+                st.session_state[task_name_input_key] = ""
+                st.rerun() # Rerun to show the new task and clear input
             else:
-                st.warning("メッセージを入力してください。")
+                st.warning("タスク名を入力してください。")
 
     st.markdown("---") # Separator
 
@@ -291,7 +291,8 @@ if st.session_state['page'] == 'main':
                       for msg in task['chat']:
                            # Apply custom CSS class for chat messages
                            sender_class = "user" if msg['sender'] == st.session_state.get('logged_in_user', 'ゲスト') else "system"
-                           st.markdown(f"<div class='chat-message {sender_class}'><strong>{msg['sender']}</strong>{msg['message']}</div>", unsafe_allow_html=True)
+                           # Add colon and space after sender name
+                           st.markdown(f"<div class='chat-message {sender_class}'><strong>{msg['sender']}:</strong> {msg['message']}</div>", unsafe_allow_html=True)
                  else:
                       st.info("このタスクにはチャット履歴がありません。")
                  # Optional: Add a button to view full chat for completed tasks if needed
@@ -366,16 +367,17 @@ elif st.session_state['page'] == 'chat':
                     with chat_container: # Display inside the scrollable container
                         # Apply custom CSS class for chat messages
                         sender_class = "user" if message['sender'] == st.session_state.get('logged_in_user', 'ゲスト') else "system"
-                        st.markdown(f"<div class='chat-message {sender_class}'><strong>{message['sender']}</strong>{message['message']}</div>", unsafe_allow_html=True)
+                        # Add colon and space after sender name
+                        st.markdown(f"<div class='chat-message {sender_class}'><strong>{message['sender']}:</strong> {message['message']}</div>", unsafe_allow_html=True)
             else:
                 with chat_container:
                     st.info("まだチャットメッセージはありません。")
             st.write("---") # Separator
 
             # Input for new message
-            # Use a unique key for the input widget itself
+            # Use a unique key for the input widget itself, associate with task ID
             new_message_input_key = f"new_chat_message_input_{current_task_id}"
-            # Get the current value from session state, default to empty string
+            # Get the current value for this task's input from session state
             current_input_value = st.session_state.get('chat_input_values', {}).get(current_task_id, "")
 
             new_message = st.text_input("新しいメッセージを入力", key=new_message_input_key, value=current_input_value)
@@ -386,7 +388,7 @@ elif st.session_state['page'] == 'chat':
                     sender = st.session_state.get('logged_in_user', 'ゲスト')
                     add_chat_message(current_task_id, sender, new_message)
                     # Clear the input box by updating the value in session state
-                    st.session_state.setdefault('chat_input_values', {})[current_task_id] = ""
+                    st.session_state.setdefault('chat_input_values', {})[current_task_id] = "" # Set to empty string
                     st.rerun() # Rerun to display the new message and clear input
                 else:
                     st.warning("メッセージを入力してください。")
