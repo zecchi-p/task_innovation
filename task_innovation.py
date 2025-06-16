@@ -5,7 +5,7 @@ import time
 import random
 
 # Set the data file path to a location in Google Drive
-DATA_FILE = '/content/drive/MyDrive/task_app_data/tasks.json' # <-- Google Drive Path
+DATA_FILE = '/content/drive/MyDrive/task_app_data/tasks.json'
 
 def load_tasks():
     """Loads tasks from the JSON data file."""
