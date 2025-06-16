@@ -4,16 +4,16 @@ import os
 import time
 import random
 
-# Set the data file path to a location in Google Drive
-DATA_FILE = '/content/drive/MyDrive/task_app_data/tasks.json'
+# Set the data file path to a location in the local Colab filesystem
+# Reverting from Google Drive to avoid persistent PermissionError issues
+DATA_FILE = 'tasks.json' # Saves directly in the /content/ directory
+
+# --- Task Data Management Functions (Simplified for local storage) ---
+# Removed Google Drive specific checks and directory creation from these functions
 
 def load_tasks():
-    """Loads tasks from the JSON data file."""
+    """Loads tasks from the JSON data file from the local filesystem."""
     if not os.path.exists(DATA_FILE):
-        # Ensure the directory exists before saving
-        data_dir = os.path.dirname(DATA_FILE)
-        if not os.path.exists(data_dir):
-            os.makedirs(data_dir, exist_ok=True) # Use exist_ok=True to avoid error if directory already exists
         # Initialize with some sample tasks if the file doesn't exist
         initial_tasks = {
             '1': {'id': '1', 'name': 'デザイン検討', 'area': 'アイデア', 'creator': 'system', 'chat': [{'sender': 'system', 'message': '最初のデザイン案について話しましょう。'}]},
@@ -26,20 +26,27 @@ def load_tasks():
         try:
             return json.load(f)
         except json.JSONDecodeError:
+            # Use st.error for visibility in the Streamlit app if it manages to start
+            # st.warning(f"タスクデータファイル '{DATA_FILE}' が無効なJSON形式です。空のタスクリストとしてロードします。")
+            print(f"Warning: Task data file '{DATA_FILE}' is invalid JSON. Loading as empty list.") # Use print for subprocess visibility
             return {} # Return empty dict if JSON is invalid
         except Exception as e:
-            print(f"Error loading tasks: {e}")
+            # Use st.error for visibility in the Streamlit app if it manages to start
+            # st.error(f"タスクファイルの読み込み中にエラーが発生しました: {e}")
+            print(f"Error loading task file: {e}") # Use print for subprocess visibility
             return {}
 
 
 def save_tasks(tasks):
-    """Saves tasks to the JSON data file."""
-    # Ensure the directory exists before saving
-    data_dir = os.path.dirname(DATA_FILE)
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir, exist_ok=True)
-    with open(DATA_FILE, 'w') as f:
-        json.dump(tasks, f, indent=4)
+    """Saves tasks to the JSON data file on the local filesystem."""
+    try:
+        with open(DATA_FILE, 'w') as f:
+            json.dump(tasks, f, indent=4)
+    except Exception as e:
+        # Use st.error for visibility in the Streamlit app if it manages to start
+        # st.error(f"タスクファイルの保存中にエラーが発生しました: {e}")
+        print(f"Error saving task file: {e}") # Use print for subprocess visibility
+
 
 def add_task(task_name, area, creator):
     """Adds a new task to the tasks data."""
@@ -153,14 +160,14 @@ if st.session_state['page'] == 'main':
                 st.success("タスクが作成されました！")
                 st.rerun() # Rerun to show the new task
             else:
-                st.warning("タスク名を入力してください。")
+                st.warning("メッセージを入力してください。")
 
     st.markdown("---") # Separator
 
     # --- Task Display Areas ---
     st.subheader("タスクボード")
 
-    tasks = load_tasks()
+    tasks = load_tasks() # Load tasks
 
     # Filter tasks by area, excluding '完了' for the main board
     idea_tasks = {k: v for k, v in tasks.items() if v['area'] == 'アイデア'}
@@ -318,7 +325,7 @@ elif st.session_state['page'] == 'chat':
         # return
     else:
         # Load all tasks and find the current task
-        tasks = load_tasks()
+        tasks = load_tasks() # Load tasks
         current_task = tasks.get(current_task_id)
 
         if not current_task:
